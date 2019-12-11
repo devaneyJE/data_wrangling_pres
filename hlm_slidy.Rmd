@@ -1,0 +1,27 @@
+---
+title: "Shiny and Other Nonsense in a Basic Multilevel Modeling Presentation"
+author: "J DeVaney"
+date: "12/12/2019"
+output: 
+  slidy_presentation:
+    css: sandstone.css
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Looking at our data...
+
+```{r include=FALSE}
+mgmt <- read.csv("mgmt2.csv")
+```
+```{r df, echo=FALSE}
+mgmt
+```
+
+# Uh-oh! {.bigger}
+
+## 
+

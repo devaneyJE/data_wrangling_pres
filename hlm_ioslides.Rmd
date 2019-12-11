@@ -1,0 +1,205 @@
+---
+title: "Data Wrangling Nonsense in a Basic Multilevel Modeling Presentation"
+author: "J DeVaney"
+date: "12/12/2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+library(vtable)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+
+mgmt <- read.csv("mgmt2.csv", header = T, stringsAsFactors = F)
+```
+
+## What will we discuss?
+
+- The project(s) for which this data was collected
+- My involvement with these projects
+- Examples of reproducible data wrangling methods
+- An approach to analyzing this data using multilevel modeling
+
+# Looking at our data...
+
+## Data: Source and Considerations
+
+> - Collected across multiple years from employed students in the Department of Management and Marketing and their work supervisors
+> - Self-reported or supervisor-reported scores for 20 surveys across 16 days for each individual
+> - 588 x 973 (`r 588*973`) observations!... sort of.
+> - So much missing data, *and* this data frame is a collection of item responses.
+
+# What is our solution? </br> Scoring and reformatting. </br> </br> How? </br> With reproducible data wrangling methods!
+
+# We know the structure, let's gather more basic information.
+
+## For a "list" of the surveys:
+```{r surveys}
+non.id <- names(subset(mgmt, select = -Assessment.ID))
+
+survey_plus <- non.id %>% 
+  str_split("Day") %>% unlist() %>% 
+  map_chr(str_extract, "^[:alpha:]+") %>% 
+  unique() %>% na.omit() %>% as.character()
+
+(surveys <- survey_plus %>% .[-(which(. == "Case"))])
+```
+
+## And the number of days:
+```{r num_days}
+(num_days <- mgmt %>%
+  names() %>%
+  str_extract("[:digit:]{1,}$") %>%
+  as.numeric() %>%
+  max(na.rm = T))
+```
+
+# Now we want to calculate survey scores with the responses, but what about items that need to be reverse scored?
+
+##
+```{r rev_score}
+rev_score <- function(x = survey, y = questionN, n = maxLikert){
+  for(i in 1:num_days){
+    mgmt[, which(
+      names(mgmt) == paste0(
+        deparse(substitute(x)),
+        deparse(substitute(y)),
+        "Day",
+        i))] <<- mgmt[, which(
+                        names(mgmt) == paste0(
+                          deparse(substitute(x)),
+                          deparse(substitute(y)),
+                          "Day",
+                          i))] %>%
+      map_dbl(~ (n + 1) - .x)
+  }
+  print(paste0("Item ",
+               deparse(substitute(x)), deparse(substitute(y)),
+               " has been altered."))
+}
+
+```
+## Process made almost too simple...
+```{r rev_2}
+#from codebook
+
+rev_score(Complain, 3, 5)
+rev_score(Fatigue, 1, 5)
+```
+
+# We want to be able to operate across days within surveys, for each survey. </br> Multidimensional iteration means... nesting for loops! </br> </br> First, we need a format for this kind of operation.
+
+## Large list arrangement
+```{r unscored_list}
+list_arrange <- function(df = mgmt){
+  assign("data_list_unscored", list(), .GlobalEnv)
+  for(i in 1:length(surveys)){
+    assign(paste0(surveys[i], "_responses"),
+           df %>% select(matches(paste0("^", surveys[i])))
+    ) ->> data_list_unscored[[i]]
+  }
+}
+list_arrange(mgmt)
+names(data_list_unscored) <- surveys
+```
+
+## Viewing data frames within large list:
+```{r}
+#via custom function
+unscored_survey_df <- function(i){
+  View(data_list_unscored[[deparse(substitute(i))]])
+}
+scored_survey_df <- function(i){
+  View(data_list_scored[[deparse(substitute(i))]])
+}
+```
+
+- unscored_survey_df(CWB)
+- scored_survey_df(OCB)
+
+# Now let's score our surveys.
+
+##
+```{r}
+assign("data_list_scored", list(), .GlobalEnv)
+for(i in 1:length(surveys)){
+  data_list_scored[[i]] <- data.frame(
+    matrix(
+      data = rep(NA, times = nrow(data_list_unscored[[i]])*num_days),
+      ncol = num_days, nrow = nrow(data_list_unscored[[i]])))
+  data_list_scored[[i]] <- data_list_scored[[i]] %>%
+    setNames(., c(paste0(surveys[i], "Day", 1:num_days)))
+}
+for(i in 1:length(surveys)){
+  for(j in 1:num_days){
+    data_list_scored[[i]][,
+      paste0(surveys[i], "Day", j)] <- data_list_unscored[[i]][,
+        str_subset(names(data_list_unscored[[i]]),
+          paste0("Day", j, "$"))] %>%
+    as.data.frame() %>% apply(1, mean)
+  }
+}
+names(data_list_scored) <- surveys
+```
+
+# While we can operate on our data in these separated frames, we should flip to a long-listed format.
+
+##
+```{r}
+for (i in 1:length(surveys)){
+  data_list_scored[[i]] <- data_list_scored[[i]] %>% tibble::rownames_to_column()
+  colnames(data_list_scored[[i]])[1] <- "id"
+  
+  data_list_scored[[i]] <- data_list_scored[[i]] %>%
+    select(id, contains(surveys[i])) %>%
+    pivot_longer(
+           cols = contains(paste0(surveys[i])),
+           names_to = "time",
+           values_to = surveys[i])
+  
+  data_list_scored[[i]]$time <- data_list_scored[[i]]$time %>%
+    str_extract("[:digit:]{1,}") %>% as.numeric()
+}
+```
+
+
+# Now we need to recombine everything into a single dataframe.
+
+##
+```{r}
+df_yikes <- bind_cols(data_list_scored[1:length(surveys)])
+df <- bind_cols(select(df_yikes, id, time), df_yikes[surveys])
+```
+
+## Where are we now?
+
+- We have a massive data frame with 20 variables, excluding id and time.
+- We don't want a massive data frame with 20 variable.
+- We're going to select variables based on hypotheses of the study.
+
+##
+```{r}
+adf_miss <- df %>% select(id, time, TaskPerf, PrevFocus, OCB)
+adf <- adf_miss %>% filter(!is.na(TaskPerf) & !is.na(PrevFocus) & !is.na(OCB))
+```
+
+# shit about the study variables
+
+## Descriptives for data subset of interest
+
+# visulization
+
+# table
+
+# model equation (reduced form?)
+
+## discussion of results values
+
+

@@ -1,6 +1,5 @@
 
 library(dplyr)
-library(magrittr)
 library(tidyr)
 library(stringr)
 library(purrr)
@@ -8,7 +7,6 @@ library(vtable)
 library(ggplot2)
 library(lme4)
 library(lmerTest)
-library(nlme)
 library(sjPlot)
 
 #reading---------------------------------------
@@ -17,7 +15,8 @@ mgmt <- read.csv("mgmt2.csv", header = T, stringsAsFactors = F)
 #View(mgmt)
 
 #variable string and day count extraction------------
-non.id <- names(subset(mgmt, select = -Assessment.ID))#take out ID variable from names; creating list of surveys
+#take out ID variable from names; create list of survey items
+non.id <- names(subset(mgmt, select = -Assessment.ID))
 
 survey_plus <- non.id %>% 
   str_split("Day") %>% unlist() %>% 
@@ -49,8 +48,9 @@ rev_score <- function(survey = x, questionN = y, maxLikert = n){
                           i))] %>%
       map_dbl(~ (n + 1) - .x)
   }
+  print(paste0("Item ", deparse(substitute(x)), deparse(substitute(y)), " has been altered."))
 }
-
+#from codebook
 rev_score(Complain, 3, 5)
 rev_score(Fatigue, 1, 5)
 
@@ -102,7 +102,10 @@ for(i in 1:length(surveys)){
 
 for(i in 1:length(surveys)){
   for(j in 1:num_days){
-    data_list_scored[[i]][, paste0(surveys[i], "Day", j)] <- data_list_unscored[[i]][, str_subset(names(data_list_unscored[[i]]), paste0("Day", j, "$"))] %>%
+    data_list_scored[[i]][,
+      paste0(surveys[i], "Day", j)] <- data_list_unscored[[i]][,
+        str_subset(names(data_list_unscored[[i]]),
+          paste0("Day", j, "$"))] %>%
     as.data.frame() %>% apply(1, mean)
     #ifelse(mean(is.na(as.data.frame(data_list_unscored[[i]][, str_subset(names(data_list_unscored[[i]]), paste0("Day", j, "$"))]))) >= .6, apply(as.data.frame(data_list_unscored[[i]][, str_subset(names(data_list_unscored[[i]]), paste0("Day", j, "$"))]), 1, mean), NA)
       #how many values involved in mean
@@ -131,8 +134,8 @@ df1 <- bind_cols(data_list_scored[1:length(surveys)])
 df <- bind_cols(select(df1, id, time), df1[surveys])
 
 #analysis df w/ time, OCB, proactive performance
-adf_miss <- df[c(1, 2, 13, 15, 16)]
-adf <- adf_miss %>% filter(!is.na(PrevFocus) & !is.na(TaskPerf) & !is.na(OCB))
+adf_miss <- df %>% select(id, time, TaskPerf, PrevFocus, OCB)
+adf <- adf_miss %>% filter(!is.na(TaskPerf) & !is.na(PrevFocus) & !is.na(OCB))
 
 
 #visualization --------------------------------
@@ -147,6 +150,11 @@ filter(adf, id %in% base::sample(adf$id, size = 20, replace = F)) %>%
 adf$time_c <- adf$time - mean(adf$time)
 adf$PrevFocus_c <- adf$PrevFocus - mean(adf$PrevFocus)
 adf$OCB_c <- adf$OCB - mean(adf$OCB)
+
+adf <- adf %>% group_by(id) %>% 
+  mutate(PrevFocus_gc = PrevFocus - mean(PrevFocus, na.rm =T))
+adf <- adf %>% group_by(id) %>% 
+  mutate(OCB_gc = OCB - mean(OCB, na.rm =T))
 
 #modeling -----------------------------------
 m0 <- lmer(data = adf, TaskPerf ~ time + (1 + time|id),
@@ -185,12 +193,41 @@ m5 <- lmer(data = adf, TaskPerf ~ OCB_c*PrevFocus_c + (1|id),
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m4, m5, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
-m6 <- lmer(data = adf, TaskPerf ~ OCB_c + PrevFocus_c + (1 + OCB_c + PrevFocus_c|id),
+m6 <- lmer(data = adf, TaskPerf ~ OCB_c + PrevFocus_c + 
+             (1 + OCB_c + PrevFocus_c|id),
            REML = F,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
-tab_model(m4, m6, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
+tab_model(m5, m6, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
-#model 6 is a winner
+
+m7 <- lmer(data = adf, TaskPerf ~ OCB_gc + PrevFocus_gc + 
+             (1 + OCB_gc + PrevFocus_gc|id),
+           REML = F,
+           control = lmerControl(optimizer = "bobyqa",
+                                 optCtrl = list(maxfun = 200000)))
+tab_model(m6, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
+
+tab_model(m1, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
+
+m5.1 <- lmer(data = adf, TaskPerf ~ OCB_gc*PrevFocus_gc + (1|id),
+             REML = F,
+             control = lmerControl(optimizer = "bobyqa",
+                                   optCtrl = list(maxfun = 200000)))
+tab_model(m5.1, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
+
+m5.2 <- lmer(data = adf, TaskPerf ~ OCB_gc*PrevFocus_gc + 
+               (1 + OCB_gc + PrevFocus_gc|id),
+             REML = F,
+             control = lmerControl(optimizer = "bobyqa",
+                                   optCtrl = list(maxfun = 200000)))
+tab_model(m5.2, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
+
+
+tab <- tab_model(m0, m1, m5.2, m7, show.ci = F, show.se = T, show.r2 = F, show.aic = T, show.loglik = T, title = "Task Performance",
+                  pred.labels = c("(Intercept)", "Time", "OCB", "Prevention Focus", "OCB:Prevention Focus"),
+                  dv.labels = c("Unconditional Growth: M0", "Baseline: M1", "Interaction: M2", "Unmoderated: M3"))
+
+#model 7 is winner
 
 #tryCatch for Shiny app
