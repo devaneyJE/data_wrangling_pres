@@ -3,7 +3,6 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(purrr)
-library(vtable)
 library(ggplot2)
 library(lme4)
 library(lmerTest)
@@ -146,7 +145,24 @@ filter(adf, id %in% base::sample(adf$id, size = 20, replace = F)) %>%
   geom_smooth(method = "lm", se =F) +
   theme_bw() + facet_wrap(~id)
 
+p_time <- ggplot(data = adf, aes(x = time, y = TaskPerf)) +
+  geom_line(aes(group = factor(id)), stat = "smooth", method = "lm", alpha = .3, fullrange = T) +
+  geom_line(size = 2, stat = "smooth", method = "lm", color = "blue") + ylim(c(0, 10))+
+  theme_bw()
+p_PrevFocus <- ggplot(data = adf, aes(x = PrevFocus, y = TaskPerf)) +
+  geom_line(aes(group = factor(id)), stat = "smooth", method = "lm", alpha = .3, fullrange = T) +
+  geom_line(size = 2, stat = "smooth", method = "lm", color = "blue") + ylim(c(0, 10))+
+  theme_bw()
+p_OCB <- ggplot(data = adf, aes(x = OCB, y = TaskPerf)) +
+  geom_line(aes(group = factor(id)), stat = "smooth", method = "lm", alpha = .3, fullrange = T) +
+  geom_line(size = 2, stat = "smooth", method = "lm", color = "blue") + ylim(c(0, 10))+
+  theme_bw()
+plot_grid(p_time, p_PrevFocus, p_OCB, nrow = 1)
+
 #centering ---------------------------------
+adf$OCB_c <- adf$OCB - mean(adf$OCB)
+adf$PrevFocus_c <- adf$PrevFocus - mean(adf$PrevFocus)
+
 adf$time_c <- adf$time - mean(adf$time)
 adf$PrevFocus_c <- adf$PrevFocus - mean(adf$PrevFocus)
 adf$OCB_c <- adf$OCB - mean(adf$OCB)
@@ -158,44 +174,44 @@ adf <- adf %>% group_by(id) %>%
 
 #modeling -----------------------------------
 m0 <- lmer(data = adf, TaskPerf ~ time + (1 + time|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m0, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m1 <- lmer(data = adf, TaskPerf ~ 1 + (1|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                      optCtrl = list(maxfun = 200000)))
 tab_model(m0, m1, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m2 <- lmer(data = adf, TaskPerf ~ OCB_c + (1|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m1, m2, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m3 <- lmer(data = adf, TaskPerf ~ PrevFocus_c + (1|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m2, m3, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m4 <- lmer(data = adf, TaskPerf ~ OCB_c + PrevFocus_c + (1|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m3, m4, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m5 <- lmer(data = adf, TaskPerf ~ OCB_c*PrevFocus_c + (1|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m4, m5, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m6 <- lmer(data = adf, TaskPerf ~ OCB_c + PrevFocus_c + 
              (1 + OCB_c + PrevFocus_c|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m5, m6, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
@@ -203,7 +219,7 @@ tab_model(m5, m6, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m7 <- lmer(data = adf, TaskPerf ~ OCB_gc + PrevFocus_gc + 
              (1 + OCB_gc + PrevFocus_gc|id),
-           REML = F,
+           REML = T ,
            control = lmerControl(optimizer = "bobyqa",
                                  optCtrl = list(maxfun = 200000)))
 tab_model(m6, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
@@ -211,20 +227,20 @@ tab_model(m6, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 tab_model(m1, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m5.1 <- lmer(data = adf, TaskPerf ~ OCB_gc*PrevFocus_gc + (1|id),
-             REML = F,
+             REML = T ,
              control = lmerControl(optimizer = "bobyqa",
                                    optCtrl = list(maxfun = 200000)))
 tab_model(m5.1, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 m5.2 <- lmer(data = adf, TaskPerf ~ OCB_gc*PrevFocus_gc + 
                (1 + OCB_gc + PrevFocus_gc|id),
-             REML = F,
+             REML = T ,
              control = lmerControl(optimizer = "bobyqa",
                                    optCtrl = list(maxfun = 200000)))
 tab_model(m5.2, m7, show.aic = T, show.r2 = F, show.ci = F, show.se = T)
 
 
-tab <- tab_model(m0, m1, m5.2, m7, show.ci = F, show.se = T, show.r2 = F, show.aic = T, show.loglik = T, title = "Task Performance",
+tab <- tab_model(m0, m1, m5.2, m7, show.ci = F, show.se = T, show.r2 = F, show.aic = F, show.loglik = F, title = "Task Performance",
                   pred.labels = c("(Intercept)", "Time", "OCB", "Prevention Focus", "OCB:Prevention Focus"),
                   dv.labels = c("Unconditional Growth: M0", "Baseline: M1", "Interaction: M2", "Unmoderated: M3"))
 

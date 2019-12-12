@@ -11,8 +11,8 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(purrr)
-library(vtable)
 library(ggplot2)
+library(cowplot)
 library(lme4)
 library(lmerTest)
 library(sjPlot)
@@ -23,9 +23,22 @@ mgmt <- read.csv("mgmt2.csv", header = T, stringsAsFactors = F)
 ## What will we discuss?
 
 - The project(s) for which this data was collected
+
 - My involvement with these projects
+
 - Examples of reproducible data wrangling methods
+
 - An approach to analyzing this data using multilevel modeling
+
+## My role
+
+- Statistical consultant
+
+- Not my data
+
+- Not my area of expertise
+
+- Making this analysis process possible *and much easier* for others
 
 # Looking at our data...
 
@@ -94,7 +107,9 @@ rev_score(Complain, 3, 5)
 rev_score(Fatigue, 1, 5)
 ```
 
-# We want to be able to operate across days within surveys, for each survey. </br> Multidimensional iteration means... nesting for loops! </br> </br> First, we need a format for this kind of operation.
+# We want to be able to operate across days within surveys, for each survey. 
+
+# Multidimensional iteration means... nesting for loops! </br> </br> First, we need a format for this kind of operation.
 
 ## Large list arrangement
 ```{r unscored_list}
@@ -154,7 +169,8 @@ names(data_list_scored) <- surveys
 ##
 ```{r}
 for (i in 1:length(surveys)){
-  data_list_scored[[i]] <- data_list_scored[[i]] %>% tibble::rownames_to_column()
+  data_list_scored[[i]] <- data_list_scored[[i]] %>%
+    tibble::rownames_to_column()
   colnames(data_list_scored[[i]])[1] <- "id"
   
   data_list_scored[[i]] <- data_list_scored[[i]] %>%
@@ -175,31 +191,92 @@ for (i in 1:length(surveys)){
 ##
 ```{r}
 df_yikes <- bind_cols(data_list_scored[1:length(surveys)])
-df <- bind_cols(select(df_yikes, id, time), df_yikes[surveys])
+(df <- bind_cols(select(df_yikes, id, time), df_yikes[surveys]))
 ```
 
 ## Where are we now?
 
 - We have a massive data frame with 20 variables, excluding id and time.
-- We don't want a massive data frame with 20 variable.
+
+- We don't want a massive data frame with 20 variables.
+
 - We're going to select variables based on hypotheses of the study.
+
+## Condensing the variable list
+
+- Task Performance: Simply, how well one performs their work. Positively correlated with regulatory focus and OCBs (Koopman et al., 2017)
+
+- Prevention Focus: Motivation driven by desire to minimize negative outcomes (Zhang, Cornwell, & Higgins, 2014)
+
+- Organizational Citizenship Behavior (OCB): Actions beyond a defined role in an organization that benefit other members or the larger collective (Wendler, Liu, & Zettler, 2018)
+
+- Let's not forget *time*
+
+## What do we want to know?
+
+- Prevention Focus and OCB are both expected to have positive relationships with Task Performance.
+
+- Zhang et al. (2014) suggested that Prevention Focus led to repetition of behavior due to initial actions being perceived as the most effective strategy to succeed, even under changing conditions that lead to negative consequences for such behavior.
+
+- It is predicted that OCB moderates the degree to which Prevention Focus predicts Task Performance, as a higher likelihood of behaviors that benefit one's environment would decrease the likelihood of negative behavioral repetition to interfere with performance.
+
 
 ##
 ```{r}
-adf_miss <- df %>% select(id, time, TaskPerf, PrevFocus, OCB)
-adf <- adf_miss %>% filter(!is.na(TaskPerf) & !is.na(PrevFocus) & !is.na(OCB))
+adf_miss <- df %>%
+  select(id, time, TaskPerf, PrevFocus, OCB)
+(adf <- adf_miss %>%
+  filter(!is.na(TaskPerf) & !is.na(PrevFocus) & !is.na(OCB)))
 ```
 
-# shit about the study variables
-
 ## Descriptives for data subset of interest
+```{r descriptives, echo=F, message=FALSE, warning=FALSE}
+adf[, c(3,4,5)] %>% psych::describe(fast = T) %>% .[, c(2, 3, 4, 5, 6)] %>% knitr::kable()
+```
 
-# visulization
+# Let's Visualize
 
-# table
+## Model Equation {.flexbox .vcenter}
 
-# model equation (reduced form?)
+$$TP_{ti} = \gamma_{00} + \gamma_{10}PF_{ti} + \gamma_{20}OCB_{ti} + \mu_{0i} + \mu_{1i}PF_{ti} + \mu_{2i}OCB_{ti} + \epsilon_{ti}$$
 
-## discussion of results values
+## Tidyverse Packages
+
+- Lionel Henry and Hadley Wickham (2019). purrr: Functional
+  Programming Tools. R package version 0.3.3.
+  https://CRAN.R-project.org/package=purrr
+- H. Wickham. ggplot2: Elegant Graphics for Data Analysis.
+  Springer-Verlag New York, 2016.
+- Hadley Wickham, Romain François, Lionel Henry and Kirill
+  Müller (2019). dplyr: A Grammar of Data Manipulation. R
+  package version 0.8.3.
+  https://CRAN.R-project.org/package=dplyr
+- Hadley Wickham (2019). stringr: Simple, Consistent Wrappers
+  for Common String Operations. R package version 1.4.0.
+  https://CRAN.R-project.org/package=stringr
+- Hadley Wickham and Lionel Henry (2019). tidyr: Tidy Messy
+  Data. R package version 1.0.0.
+  https://CRAN.R-project.org/package=tidyr
+
+## More Packages
+
+- Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker
+  (2015). Fitting Linear Mixed-Effects Models Using lme4.
+  Journal of Statistical Software, 67(1), 1-48.
+  doi:10.18637/jss.v067.i01.
+- Lüdecke D (2019). _sjPlot: Data Visualization for Statistics
+  in Social Science_. doi: 10.5281/zenodo.1308157 (URL:
+  https://doi.org/10.5281/zenodo.1308157), R package version
+  2.7.2, <URL: https://CRAN.R-project.org/package=sjPlot>.
+- Claus O. Wilke (2019). cowplot: Streamlined Plot Theme and
+  Plot Annotations for 'ggplot2'. R package version 1.0.0.
+  https://CRAN.R-project.org/package=cowplot
+  
+## References
+
+- Koopmann, J., Johnson, R. E., Wang, M., Lanaj, K., Wang, G., & Shi, J. (2019). A self-regulation perspective on how and when regulatory focus differentially relates to citizenship behaviors. *Journal of Applied Psychology,* 104(5), 629–641.
+- Wendler, K., Liu, J., & Zettler, I. (2018). Honesty-humility interacts with context perception in predicting task performance and organizational citizenship behavior.*Journal of Personnel Psychology,*17(4), 161–171.
+- Zhang, S., Cornwell, J. F. M., & Higgins, E. T. (2014). Repeating the past: Prevention focus fotivates repetition, even for unethical decisions. *Psychological Science,* 25(1), 179–187.
+
 
 
