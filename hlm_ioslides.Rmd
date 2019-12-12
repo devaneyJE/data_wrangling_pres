@@ -30,7 +30,7 @@ mgmt <- read.csv("mgmt2.csv", header = T, stringsAsFactors = F)
 
 - An approach to analyzing this data using multilevel modeling
 
-## My role
+## My Role
 
 - Statistical consultant
 
@@ -109,7 +109,7 @@ rev_score(Fatigue, 1, 5)
 
 # We want to be able to operate across days within surveys, for each survey. 
 
-# Multidimensional iteration means... nesting for loops! </br> </br> First, we need a format for this kind of operation.
+# Multidimensional iteration means... nesting *for* loops! </br> </br> First, we need a format for this kind of operation.
 
 ## Large list arrangement
 ```{r unscored_list}
@@ -216,7 +216,7 @@ df_yikes <- bind_cols(data_list_scored[1:length(surveys)])
 
 - Prevention Focus and OCB are both expected to have positive relationships with Task Performance.
 
-- Zhang et al. (2014) suggested that Prevention Focus led to repetition of behavior due to initial actions being perceived as the most effective strategy to succeed, even under changing conditions that lead to negative consequences for such behavior.
+- Zhang et al. (2014) suggested that Prevention Focus leads to repetition of behavior due to initial actions being perceived as the most effective strategy to succeed, even under changing conditions that lead to negative consequences for such behavior.
 
 - It is predicted that OCB moderates the degree to which Prevention Focus predicts Task Performance, as a higher likelihood of behaviors that benefit one's environment would decrease the likelihood of negative behavioral repetition to interfere with performance.
 

@@ -246,4 +246,10 @@ tab <- tab_model(m0, m1, m5.2, m7, show.ci = F, show.se = T, show.r2 = F, show.a
 
 #model 7 is winner
 
+#design effect ---------------------------------------------------
+#effective sample size
+744/(1 + .75*((744/54)-1))
+#deft
+sqrt(1 + .75*((744/54) - 1))
+
 #tryCatch for Shiny app
